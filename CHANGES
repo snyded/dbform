@@ -1,0 +1,6 @@
+D 1.2 03/06/26 15:03:56 dave 3 2
+Added reverse attribute to serial fields
+D 1.1 03/06/26 09:10:32 dave 2 1
+Added -c color attribute option
+D 1.0 93/12/24 13:40:04 dave 1 0
+Initial version

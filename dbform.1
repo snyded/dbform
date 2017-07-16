@@ -1,0 +1,34 @@
+.\"
+.\" @(#) dbform.1 1.2  06/26/2003 15:03:56
+.\"
+.TH DBFORM 1 "dbform 1.2"
+.SH NAME
+dbform \- generates default data entry forms
+.SH SYNOPSIS
+dbform \-d dbname \-t tabname [\-t tabname...] [-c]
+.SH DESCRIPTION
+.I Dbform
+generates default data entry forms for "quick & dirty" access to
+Informix database tables.
+.SH OPTIONS
+.TP
+.B \-d
+database name
+.TP
+.B \-t
+table name
+.TP
+.B \-c
+color used to display the data
+.SH NOTES
+.I Dbform
+requires that Informix-SQL be installed on your system.
+.PP
+YELLOW/BOLD is the default color when -c is not specified.
+.PP
+Serial fields are tagged with the REVERSE attribute.
+.SH KNOWN ISSUES
+.I Dbform
+can only support a MAX of 26 single character fields.
+.SH SUPPORT
+Send bug reports to Dave Snyder <dave@snide.com>

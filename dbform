@@ -1,0 +1,137 @@
+#!/bin/sh
+
+#   @(#) dbform 1.2  06/26/2003 15:03:56
+#
+#   dbform - generates default data entry forms
+#   Copyright (C) 1992,2003  David A. Snyder
+#
+#   This program is free software; you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation; version 2 of the License.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with this program; if not, write to the Free Software
+#   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+
+# Cleanup if program unexpectedly dies
+trap "rm -f $TMPFILE.*" 1 2 3 15
+TMPFILE=/tmp/dbf$$
+
+
+# Define the "colorError" function
+colorError() {
+  echo "dbform: An illegal color has been specified.  Colors 0 through 7 are" >&2
+  echo "        white, yellow, magenta, red, cyan, green, blue, and black." >&2
+  echo "        See error number -2021." >&2
+  exit 1
+}
+
+# Define the "usage" function
+usage() {
+  echo "usage: $0 -d dbname -t tabname [-t tabname...] [-c color]" >&2
+  exit 1
+}
+
+
+# Display copyright information
+(echo "DBFORM version 1.2, Copyright (C) 1992,2003 David A. Snyder"; echo) >&2
+
+
+# Process the command line and any arguments
+set -- `getopt c:d:t: $* 2>/dev/null`
+test $? != 0 usage
+
+for i in $*
+do
+  case $i in
+  -c)
+    CLRNAME=$2
+    shift 2
+    ;;
+  -d)
+    DBNAME=$2
+    shift 2
+    ;;
+  -t)
+    TABNAMES="$TABNAMES $2"
+    shift 2
+    ;;
+  --)
+    shift
+    break
+    ;;
+  esac
+done
+
+# Set the color to yellow if one wasn't specified
+COLOR=${CLRNAME-yellow}
+
+# Test to make sure DBNAME & TABNAMES are not empty and COLOR is valid.
+test -z "$DBNAME" && usage
+test -z "$TABNAMES" && usage
+test "$COLOR" != "white" -a "$COLOR" != "yellow" -a "$COLOR" != "magenta" -a \
+     "$COLOR" != "red" -a "$COLOR" != "cyan" -a "$COLOR" != "green" -a \
+     "$COLOR" != "blue" -a "$COLOR" != "black" && colorError
+
+
+# Build the default form
+sformbld -d $TMPFILE $DBNAME $TABNAMES | egrep -v "^[ICST]|^$|success" | head -1
+
+# Apply color to the default form
+if [ -s $TMPFILE.frm ]; then
+  echo "The form \"$TMPFILE.per\" will now be edited."
+  ed - $TMPFILE.per <<!! >/dev/null 2>&1
+1,$ s/\;/\, COLOR\=$COLOR\;/
+w
+q
+!!
+else
+  echo "The form \"$TMPFILE.per\" could NOT be compiled!"
+  rm -f $TMPFILE.*
+  exit 1
+fi
+
+# Apply reverse to any serial fields
+for TABNAME in $TABNAMES
+do
+  dbaccess $DBNAME - <<!! >/dev/null 2>&1
+unload to "$TMPFILE.unl" delimiter ' '
+select  colname
+from    syscolumns, systables
+where   syscolumns.tabid = systables.tabid
+and     systables.tabname = "$TABNAME"
+and     (syscolumns.coltype = 262 or syscolumns.coltype = 6)
+!!
+  awk '{print $1}' $TMPFILE.unl |
+  while read COLNAME rest_of_line
+  do
+    if [ -n "$COLNAME" ]; then
+      ed - $TMPFILE.per <<!! >/dev/null 2>&1
+1,$ s/$TABNAME.$COLNAME\, COLOR\=$COLOR\;/$TABNAME.$COLNAME\, REVERSE\;/
+w
+q
+!!
+    fi
+  done
+done
+
+# Compile and run the form
+sformbld $TMPFILE | egrep -v "^[ICST]|^$|success" | head -1
+if [ -s $TMPFILE.frm ]; then
+  sperform $TMPFILE
+else
+  echo "The form \"$TMPFILE.per\" could NOT be compiled!"
+  rm -f $TMPFILE.*
+  exit 1
+fi
+
+
+# Delete the work files and exit
+rm -f $TMPFILE.*
+exit 0
